@@ -7,7 +7,7 @@ class TaxController {
     const { lineItems, stateId } = _req.body
     try {
       const tax = await TaxController.#calculateExciseTax(lineItems, stateId)
-      res.status(200).json({ tax: tax })
+      res.status(200).json({ tax: parseInt(tax * 100) })
     } catch (error) {
       console.log(error)
       res.status(400).json({ error: error })
@@ -43,8 +43,8 @@ class TaxController {
 
     const productPromises = itemIds.map(itemId => shopify.getProductDataById(itemId))
     const productResponses = await Promise.all(productPromises)
-    let index = 0;
-    for (const  item of items) {
+    let index = 0
+    for (const item of items) {
       let qty = 1
       let exciseTaxPercent = 0
       let exciseTaxValue = 0
@@ -52,7 +52,7 @@ class TaxController {
       let exciseRetailBase = 0
       let exciseOnlyVolume = 0
 
-      const product = productResponses[index].product;
+      const product = productResponses[index].product
       index++
       const endType = this.#findMetafieldValueByKey(product, 'ends-type')
       const juiceType = this.#findMetafieldValueByKey(product, 'juice-type')
