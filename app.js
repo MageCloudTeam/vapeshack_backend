@@ -4,13 +4,29 @@ var path = require('path');
 var cookieParser = require('cookie-parser');
 var logger = require('morgan');
 const dotenv = require('dotenv');
+const cors = require('cors');
 dotenv.config();
 
 var indexRouter = require('./routes/index');
 var taxRouter = require('./routes/tax');
+const customCorsOptions = require('./customCorsOptions')
 
 var app = express();
+// app.use(cors(customCorsOptions));
+const corsOpts = {
+  origin: '*',
 
+  methods: [
+    'GET',
+    'POST',
+  ],
+
+  allowedHeaders: [
+    'Content-Type',
+  ],
+};
+
+app.use(cors(corsOpts));
 // view engine setup
 app.set('views', path.join(__dirname, 'views'));
 app.set('view engine', 'jade');

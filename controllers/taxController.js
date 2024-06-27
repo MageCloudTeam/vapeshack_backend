@@ -5,8 +5,13 @@ class TaxController {
   static async calculateTaxes (_req, res) {
 
     const { lineItems, stateId } = _req.body
-    const taxes = await TaxController.calculateExciseTax(lineItems, stateId)
-    res.json(taxes).send()
+    try {
+      const tax = await TaxController.#calculateExciseTax(lineItems, stateId)
+      res.status(200).json({ tax: tax })
+    } catch (error) {
+      console.log(error)
+      res.status(400).json({ error: error })
+    }
   }
 
   static #getStateTaxPrice (stateId) {
@@ -26,7 +31,7 @@ class TaxController {
     return stateTaxData[stateId] || {}
   }
 
-  static async calculateExciseTax (items, stateId) {
+  static async #calculateExciseTax (items, stateId) {
 
     let amount = 0
     const taxValueArr = this.#getStateTaxPrice(stateId)
@@ -34,8 +39,12 @@ class TaxController {
     if (Object.keys(taxValueArr).length === 0) {
       return amount
     }
+    const itemIds = items.map(item => item.product_id)
 
-    for (const item of items) {
+    const productPromises = itemIds.map(itemId => shopify.getProductDataById(itemId))
+    const productResponses = await Promise.all(productPromises)
+    let index = 0;
+    for (const  item of items) {
       let qty = 1
       let exciseTaxPercent = 0
       let exciseTaxValue = 0
@@ -43,21 +52,22 @@ class TaxController {
       let exciseRetailBase = 0
       let exciseOnlyVolume = 0
 
-      const resp = await shopify.getProductDataById(item.product_id)
-      const product = resp.product
-      const variant = this.#findVariantById(product,item.variant_id)
-      const endType = this.#findMetafieldValueByKey(product,'ends-type')
-      const juiceType =this.#findMetafieldValueByKey(product,'juice-type')
-      const juiceVolume = parseFloat(this.#findMetafieldValueByKey(product,'juice-volume-ml'))
-      const juiceCartridgeType = this.#findMetafieldValueByKey(product,'juice-cartridge-type')
+      const product = productResponses[index].product;
+      index++
+      const endType = this.#findMetafieldValueByKey(product, 'ends-type')
+      const juiceType = this.#findMetafieldValueByKey(product, 'juice-type')
+      const juiceVolume = parseFloat(this.#findMetafieldValueByKey(product, 'juice-volume-ml'))
+      const juiceCartridgeType = this.#findMetafieldValueByKey(product, 'juice-cartridge-type')
+      const variant = this.#findVariantById(product, item.variant_id)
+      const cost = parseFloat(variant?.inventoryItem?.unitCost?.amount || 0)
       // Do not charge excise tax on 0 nicotine products in CA
       if (stateId === 12 && endType === 'NoNicotine') {
         continue
       }
-      const cost = parseFloat(variant?.inventoryItem?.unitCost?.amount||0)
+
       const itemParent = item
       qty = itemParent.quantity
-      const itemPrice = itemParent.price/100
+      const itemPrice = itemParent.price / 100
 
       if ([23, 32, 34, 51].includes(stateId)) {
         if (taxValueArr.wholesale && cost) {
@@ -94,13 +104,11 @@ class TaxController {
           amount += (juiceVolume * exciseVolumeBase * qty)
           itemParent.exciseTax = (juiceVolume * exciseVolumeBase * qty)
         } else if (exciseRetailBase && itemPrice && exciseTaxPercent) {
-          console.log(itemPrice)
           amount += ((itemPrice * exciseTaxPercent / 100) * qty)
           itemParent.exciseTax = (itemPrice * exciseTaxPercent / 100) * qty
         } else if (exciseOnlyVolume && juiceVolume) {
           let exciseAmt = 0
           if (juiceType === 'Open') {
-
 
             exciseAmt = taxValueArr.open
           } else if (juiceType === 'Closed') {
@@ -126,29 +134,29 @@ class TaxController {
     return amount
   }
 
-  static  #findMetafieldValueByKey(product, searchKey) {
-    const edges = product?.metafields?.edges;
+  static #findMetafieldValueByKey (product, searchKey) {
+    const edges = product?.metafields?.edges
 
     for (const edge of edges) {
-      const { key, value } = edge.node;
+      const { key, value } = edge.node
       if (key === searchKey) {
-        return value;
+        return value
       }
     }
 
-    return false;
+    return false
   }
 
-  static #findVariantById(product, variantId) {
-    const nodes = product.variants.nodes;
+  static #findVariantById (product, variantId) {
+    const nodes = product.variants.nodes
 
     for (const node of nodes) {
-      if (node.id.replace('gid://shopify/ProductVariant/','') == variantId) {
-        return node;
+      if (node.id.replace('gid://shopify/ProductVariant/', '') == variantId) {
+        return node
       }
     }
 
-    return null;
+    return null
   }
 }
 
