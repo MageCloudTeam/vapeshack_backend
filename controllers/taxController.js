@@ -69,21 +69,21 @@ class TaxController {
       qty = itemParent.quantity
       const itemPrice = itemParent.price / 100
 
-      if ([23, 32, 34, 51].includes(stateId)) {
+      if (['23', '32', '34', '51'].includes(stateId)) {
         if (taxValueArr.wholesale && cost) {
           amount += ((cost * taxValueArr.wholesale / 100) * qty)
           itemParent.exciseTax = (cost * taxValueArr.wholesale / 100) * qty
         }
       } else {
-
         if (juiceType === 'Open') {
           exciseTaxPercent = taxValueArr.open
         } else if (juiceType === 'Closed') {
-          if ([39, 12].includes(stateId)) {
+          if (['39', '12'].includes(stateId)) {
             exciseTaxValue = 0
             exciseTaxPercent = taxValueArr.open
           } else {
             exciseTaxValue = taxValueArr.close
+
           }
         }
 
@@ -91,12 +91,11 @@ class TaxController {
           exciseTaxValue = 0
           exciseTaxPercent = taxValueArr.open
         }
-
         exciseVolumeBase = taxValueArr.volumebase || 0
         exciseRetailBase = taxValueArr.retailprice || 0
         exciseOnlyVolume = taxValueArr.onlyvolume || 0
         // For items who have not set juice_type or juice_volume
-        if (exciseTaxPercent === 0 && stateId === 12) {
+        if (exciseTaxPercent === 0 && stateId === '12') {
           exciseTaxPercent = taxValueArr.open
         }
         // Volume Base
@@ -122,10 +121,9 @@ class TaxController {
             amount += ((cost * exciseTaxPercent / 100) * qty)
             itemParent.exciseTax = (cost * exciseTaxPercent / 100) * qty
           }
-
           // Closed
           if (exciseTaxValue && juiceVolume) {
-            amount += (juiceVolume * exciseTaxValue * qty)
+            amount += ((juiceVolume * exciseTaxValue) * qty)
             itemParent.exciseTax = (juiceVolume * exciseTaxValue * qty)
           }
         }
