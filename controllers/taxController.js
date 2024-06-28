@@ -13,8 +13,8 @@ class TaxController {
 
     const { lineItems, stateId } = _req.body
     try {
-      const tax = await TaxController.#calculateExciseTax(lineItems, stateId)
-      res.status(200).json({ tax: parseInt(tax * 100) })
+      const result = await TaxController.#calculateExciseTax(lineItems, stateId)
+      res.status(200).json( result )
     } catch (error) {
       res.status(400).json({ error: error })
     }
@@ -26,22 +26,18 @@ class TaxController {
       const stateId = this.#getState(order.billing_address)
       const tags = order.tags.split(', ').push('tax-issue')
       if (stateId) {
-        const tax = await TaxController.#calculateExciseTax(order.line_items, stateId)
-        const quantity = parseInt(tax * 100)
+        const quantity = (await TaxController.#calculateExciseTax(order.line_items, stateId))?.summary
         const taxProduct = order.line_items.find(item => {return item.product_id === 7075063005264})
-        if (quantity === 0&&!taxProduct||(quantity === taxProduct.quantity)) {
+        if (quantity === 0 && !taxProduct || (quantity === taxProduct.quantity)) {
           return res.status(200).json()
-        } else{
+        } else {
           await TaxController.shopify.order.update(order.id, { tags: tags.join(', ') })
           return res.status(200).json()
         }
-
-
       } else {
         return res.status(200).json()
       }
 
-      res.status(200).json()
     } catch (error) {
       res.status(400).json({ error: error })
     }
@@ -77,6 +73,7 @@ class TaxController {
     const productPromises = itemIds.map(itemId => shopify.getProductDataById(itemId))
     const productResponses = await Promise.all(productPromises)
     let index = 0
+    let exciseItems = []
     for (const item of items) {
       let qty = 1
       let exciseTaxPercent = 0
@@ -91,6 +88,9 @@ class TaxController {
       const juiceType = this.#findMetafieldValueByKey(product, 'juice-type')
       const juiceVolume = parseFloat(this.#findMetafieldValueByKey(product, 'juice-volume-ml'))
       const juiceCartridgeType = this.#findMetafieldValueByKey(product, 'juice-cartridge-type')
+      if (!endType&&!juiceType&&!juiceVolume&&!juiceCartridgeType){
+        continue
+      }
       const variant = this.#findVariantById(product, item.variant_id)
       const cost = parseFloat(variant?.inventoryItem?.unitCost?.amount || 0)
       // Do not charge excise tax on 0 nicotine products in CA
@@ -100,12 +100,11 @@ class TaxController {
 
       const itemParent = item
       qty = itemParent.quantity
-      const itemPrice = itemParent.price / 100
-
+      const itemPrice = itemParent.price
       if (['23', '32', '34', '51'].includes(stateId)) {
         if (taxValueArr.wholesale && cost) {
-          amount += ((cost * taxValueArr.wholesale / 100) * qty)
-          itemParent.exciseTax = (cost * taxValueArr.wholesale / 100) * qty
+          amount += parseInt(((cost * taxValueArr.wholesale / 100) * qty))
+          itemParent.exciseTax = parseInt((cost * taxValueArr.wholesale / 100) * qty)
         }
       } else {
         if (juiceType === 'Open') {
@@ -119,7 +118,6 @@ class TaxController {
 
           }
         }
-
         if (stateId === 19 && juiceType === 'Closed' && juiceCartridgeType === 'single-use') {
           exciseTaxValue = 0
           exciseTaxPercent = taxValueArr.open
@@ -133,11 +131,16 @@ class TaxController {
         }
         // Volume Base
         if (exciseVolumeBase && juiceVolume) {
-          amount += (juiceVolume * exciseVolumeBase * qty)
-          itemParent.exciseTax = (juiceVolume * exciseVolumeBase * qty)
+
+          amount += parseInt((juiceVolume * exciseVolumeBase * qty))
+          itemParent.exciseTax = parseInt((juiceVolume * exciseVolumeBase * qty))
+
         } else if (exciseRetailBase && itemPrice && exciseTaxPercent) {
-          amount += ((itemPrice * exciseTaxPercent / 100) * qty)
-          itemParent.exciseTax = (itemPrice * exciseTaxPercent / 100) * qty
+
+          amount += parseInt(((itemPrice * exciseTaxPercent / 100) * qty))
+          itemParent.exciseTax = parseInt((itemPrice * exciseTaxPercent / 100) * qty)
+
+
         } else if (exciseOnlyVolume && juiceVolume) {
           let exciseAmt = 0
           if (juiceType === 'Open') {
@@ -146,23 +149,34 @@ class TaxController {
           } else if (juiceType === 'Closed') {
             exciseAmt = taxValueArr.close
           }
-          amount += (juiceVolume * exciseAmt * qty)
-          itemParent.exciseTax = (juiceVolume * exciseAmt * qty)
+          amount += parseInt((juiceVolume * exciseAmt * qty))
+          itemParent.exciseTax = parseInt((juiceVolume * exciseAmt * qty))
+
         } else {
+
           // Open
           if (cost && exciseTaxPercent) {
-            amount += ((cost * exciseTaxPercent / 100) * qty)
-            itemParent.exciseTax = (cost * exciseTaxPercent / 100) * qty
+            amount += parseInt(((cost * exciseTaxPercent / 100) * qty))
+            itemParent.exciseTax = parseInt((cost * exciseTaxPercent / 100) * qty)
           }
           // Closed
           if (exciseTaxValue && juiceVolume) {
-            amount += ((juiceVolume * exciseTaxValue) * qty)
-            itemParent.exciseTax = (juiceVolume * exciseTaxValue * qty)
+            amount += parseInt(((juiceVolume * exciseTaxValue) * qty))
+            itemParent.exciseTax = parseInt((juiceVolume * exciseTaxValue * qty))
           }
+
         }
+
       }
+      exciseItems.push({
+        title: itemParent.title,
+        tax: itemParent.exciseTax / 100,
+      })
     }
-    return amount
+    return {
+      summary: amount,
+      items: exciseItems,
+    }
   }
 
   static #findMetafieldValueByKey (product, searchKey) {
