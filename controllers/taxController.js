@@ -169,7 +169,7 @@ class TaxController {
 
       }
       exciseItems.push({
-        title: itemParent.title,
+        title: itemParent.handle,
         tax: itemParent.exciseTax / 100,
       })
     }
