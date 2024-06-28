@@ -66,7 +66,10 @@ class TaxController {
     const taxValueArr = this.#getStateTaxPrice(stateId)
 
     if (Object.keys(taxValueArr).length === 0) {
-      return amount
+      return {
+        summary: amount,
+        items: [],
+      }
     }
     const itemIds = items.map(item => item.product_id)
 
