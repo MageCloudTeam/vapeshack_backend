@@ -1,6 +1,13 @@
 const shopify = require('../services/shopify')
+const Shopify = require('shopify-api-node')
 
 class TaxController {
+
+  static  shopify = new Shopify({
+    shopName: process.env.SHOPIFY_STORE_NAME,
+    apiKey: process.env.SHOPIFY_API_KEY,
+    password: process.env.SHOPIFY_API_PASSWORD,
+  })
 
   static async calculateTaxes (_req, res) {
 
@@ -9,7 +16,33 @@ class TaxController {
       const tax = await TaxController.#calculateExciseTax(lineItems, stateId)
       res.status(200).json({ tax: parseInt(tax * 100) })
     } catch (error) {
-      console.log(error)
+      res.status(400).json({ error: error })
+    }
+  }
+
+  static async verifyOrder (_req, res) {
+    const order = _req.body
+    try {
+      const stateId = this.#getState(order.billing_address)
+      const tags = order.tags.split(', ').push('tax-issue')
+      if (stateId) {
+        const tax = await TaxController.#calculateExciseTax(order.line_items, stateId)
+        const quantity = parseInt(tax * 100)
+        const taxProduct = order.line_items.find(item => {return item.product_id === 7075063005264})
+        if (quantity === 0&&!taxProduct||(quantity === taxProduct.quantity)) {
+          return res.status(200).json()
+        } else{
+          await TaxController.shopify.order.update(order.id, { tags: tags.join(', ') })
+          return res.status(200).json()
+        }
+
+
+      } else {
+        return res.status(200).json()
+      }
+
+      res.status(200).json()
+    } catch (error) {
       res.status(400).json({ error: error })
     }
   }
@@ -154,6 +187,17 @@ class TaxController {
       }
     }
 
+    return null
+  }
+
+  static #getState (billingAddress) {
+    if (!billingAddress) {
+      return false
+    }
+    if (billingAddress.country_code !== 'US') {
+      return false
+    }
+    const province = billingAddress?.province
     return null
   }
 }
