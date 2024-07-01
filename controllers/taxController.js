@@ -137,9 +137,8 @@ class TaxController {
         }
         // Volume Base
         if (exciseVolumeBase && juiceVolume) {
-
-          amount += parseInt((juiceVolume * exciseVolumeBase * qty))
-          itemParent.exciseTax = parseInt((juiceVolume * exciseVolumeBase * qty))
+          amount += parseInt((juiceVolume * exciseVolumeBase * qty)*100)
+          itemParent.exciseTax = parseInt((juiceVolume * exciseVolumeBase * qty)*100)
 
         } else if (exciseRetailBase && itemPrice && exciseTaxPercent) {
 
@@ -154,8 +153,8 @@ class TaxController {
           } else if (juiceType === 'Closed') {
             exciseAmt = taxValueArr.close
           }
-          amount += parseInt((juiceVolume * exciseAmt * qty))
-          itemParent.exciseTax = parseInt((juiceVolume * exciseAmt * qty))
+          amount += parseInt((juiceVolume * exciseAmt * qty)*100)
+          itemParent.exciseTax = parseInt((juiceVolume * exciseAmt * qty)*100)
 
         } else {
 
@@ -166,8 +165,8 @@ class TaxController {
           }
           // Closed
           if (exciseTaxValue && juiceVolume) {
-            amount += parseInt(((juiceVolume * exciseTaxValue) * qty))
-            itemParent.exciseTax = parseInt((juiceVolume * exciseTaxValue * qty))
+            amount += parseInt(((juiceVolume * exciseTaxValue) * qty)*100)
+            itemParent.exciseTax = parseInt((juiceVolume * exciseTaxValue * qty)*100)
           }
 
         }
