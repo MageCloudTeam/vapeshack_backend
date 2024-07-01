@@ -109,7 +109,8 @@ class TaxController {
           amount += parseInt(((cost * taxValueArr.wholesale / 100) * qty))
           itemParent.exciseTax = parseInt((cost * taxValueArr.wholesale / 100) * qty)
         }
-      } else {
+      }
+      else {
         if (juiceType === 'Open') {
           exciseTaxPercent = taxValueArr.open
         } else if (juiceType === 'Closed') {
@@ -140,8 +141,8 @@ class TaxController {
 
         } else if (exciseRetailBase && itemPrice && exciseTaxPercent) {
 
-          amount += parseInt(((itemPrice * exciseTaxPercent / 100) * qty))
-          itemParent.exciseTax = parseInt((itemPrice * exciseTaxPercent / 100) * qty)
+          amount += parseInt(((itemPrice * exciseTaxPercent ) * qty))
+          itemParent.exciseTax = parseInt((itemPrice * exciseTaxPercent ) * qty)
 
 
         } else if (exciseOnlyVolume && juiceVolume) {
@@ -159,8 +160,8 @@ class TaxController {
 
           // Open
           if (cost && exciseTaxPercent) {
-            amount += parseInt(((cost * exciseTaxPercent / 100) * qty))
-            itemParent.exciseTax = parseInt((cost * exciseTaxPercent / 100) * qty)
+            amount += parseInt(((cost * exciseTaxPercent ) * qty))
+            itemParent.exciseTax = parseInt((cost * exciseTaxPercent ) * qty)
           }
           // Closed
           if (exciseTaxValue && juiceVolume) {
