@@ -14,19 +14,21 @@ class TaxController {
     const { lineItems, stateId } = _req.body
     try {
       const result = await TaxController.#calculateExciseTax(lineItems, stateId)
-      res.status(200).json( result )
+      res.status(200).json(result)
     } catch (error) {
       res.status(400).json({ error: error })
     }
   }
 
   static async verifyOrder (_req, res) {
-    const order = _req.body
+    console.log(_req.body)
     try {
-      const stateId = this.#getState(order.billing_address)
-      const tags = order.tags.split(', ').push('tax-issue')
+      const order = _req.body
+      const stateId = TaxController.#getStateId(order.billing_address.province)
+      let tags = order.tags.split(', ')
+      tags.push('tax-issue')
       if (stateId) {
-        const quantity = (await TaxController.#calculateExciseTax(order.line_items, stateId))?.summary
+        const quantity = (await TaxController.#calculateExciseTax(order.line_items, stateId.toString()))?.summary
         const taxProduct = order.line_items.find(item => {return item.product_id === 7075063005264})
         if (quantity === 0 && !taxProduct || (quantity === taxProduct.quantity)) {
           return res.status(200).json()
@@ -39,6 +41,7 @@ class TaxController {
       }
 
     } catch (error) {
+      console.log(error)
       res.status(400).json({ error: error })
     }
   }
@@ -91,7 +94,7 @@ class TaxController {
       const juiceType = this.#findMetafieldValueByKey(product, 'juice-type')
       const juiceVolume = parseFloat(this.#findMetafieldValueByKey(product, 'juice-volume-ml'))
       const juiceCartridgeType = this.#findMetafieldValueByKey(product, 'juice-cartridge-type')
-      if (!endType&&!juiceType&&!juiceVolume&&!juiceCartridgeType){
+      if (!endType && !juiceType && !juiceVolume && !juiceCartridgeType) {
         continue
       }
       const variant = this.#findVariantById(product, item.variant_id)
@@ -106,11 +109,10 @@ class TaxController {
       const itemPrice = itemParent.price
       if (['23', '32', '34', '51'].includes(stateId)) {
         if (taxValueArr.wholesale && cost) {
-          amount += parseInt(((cost * taxValueArr.wholesale ) * qty))
-          itemParent.exciseTax = parseInt((cost * taxValueArr.wholesale ) * qty)
+          amount += parseInt(((cost * taxValueArr.wholesale) * qty))
+          itemParent.exciseTax = parseInt((cost * taxValueArr.wholesale) * qty)
         }
-      }
-      else {
+      } else {
         if (juiceType === 'Open') {
           exciseTaxPercent = taxValueArr.open
         } else if (juiceType === 'Closed') {
@@ -141,9 +143,8 @@ class TaxController {
 
         } else if (exciseRetailBase && itemPrice && exciseTaxPercent) {
 
-          amount += parseInt(((itemPrice * exciseTaxPercent ) * qty))
-          itemParent.exciseTax = parseInt((itemPrice * exciseTaxPercent ) * qty)
-
+          amount += parseInt(((itemPrice * exciseTaxPercent) * qty))
+          itemParent.exciseTax = parseInt((itemPrice * exciseTaxPercent) * qty)
 
         } else if (exciseOnlyVolume && juiceVolume) {
           let exciseAmt = 0
@@ -160,8 +161,8 @@ class TaxController {
 
           // Open
           if (cost && exciseTaxPercent) {
-            amount += parseInt(((cost * exciseTaxPercent ) * qty))
-            itemParent.exciseTax = parseInt((cost * exciseTaxPercent ) * qty)
+            amount += parseInt(((cost * exciseTaxPercent) * qty))
+            itemParent.exciseTax = parseInt((cost * exciseTaxPercent) * qty)
           }
           // Closed
           if (exciseTaxValue && juiceVolume) {
@@ -208,16 +209,84 @@ class TaxController {
     return null
   }
 
-  static #getState (billingAddress) {
-    if (!billingAddress) {
+  static #getStateId (stateName) {
+    if (!stateName) {
       return false
     }
-    if (billingAddress.country_code !== 'US') {
-      return false
+    const statesData = {
+      'states': [
+        { 'name': 'Alabama', 'id': 1 },
+        { 'name': 'Alaska', 'id': 2 },
+        { 'name': 'American Samoa', 'id': 3 },
+        { 'name': 'Arizona', 'id': 4 },
+        { 'name': 'Arkansas', 'id': 5 },
+        { 'name': 'Armed Forces Africa', 'id': 6 },
+        { 'name': 'Armed Forces Americas', 'id': 7 },
+        { 'name': 'Armed Forces Canada', 'id': 8 },
+        { 'name': 'Armed Forces Europe', 'id': 9 },
+        { 'name': 'Armed Forces Middle East', 'id': 10 },
+        { 'name': 'Armed Forces Pacific', 'id': 11 },
+        { 'name': 'California', 'id': 12 },
+        { 'name': 'Colorado', 'id': 13 },
+        { 'name': 'Connecticut', 'id': 14 },
+        { 'name': 'Delaware', 'id': 15 },
+        { 'name': 'District of Columbia', 'id': 16 },
+        { 'name': 'Federated States Of Micronesia', 'id': 17 },
+        { 'name': 'Florida', 'id': 18 },
+        { 'name': 'Georgia', 'id': 19 },
+        { 'name': 'Guam', 'id': 20 },
+        { 'name': 'Hawaii', 'id': 21 },
+        { 'name': 'Idaho', 'id': 22 },
+        { 'name': 'Illinois', 'id': 23 },
+        { 'name': 'Indiana', 'id': 24 },
+        { 'name': 'Iowa', 'id': 25 },
+        { 'name': 'Kansas', 'id': 26 },
+        { 'name': 'Kentucky', 'id': 27 },
+        { 'name': 'Louisiana', 'id': 28 },
+        { 'name': 'Maine', 'id': 29 },
+        { 'name': 'Marshall Islands', 'id': 30 },
+        { 'name': 'Maryland', 'id': 31 },
+        { 'name': 'Massachusetts', 'id': 32 },
+        { 'name': 'Michigan', 'id': 33 },
+        { 'name': 'Minnesota', 'id': 34 },
+        { 'name': 'Mississippi', 'id': 35 },
+        { 'name': 'Missouri', 'id': 36 },
+        { 'name': 'Montana', 'id': 37 },
+        { 'name': 'Nebraska', 'id': 38 },
+        { 'name': 'Nevada', 'id': 39 },
+        { 'name': 'New Hampshire', 'id': 40 },
+        { 'name': 'New Jersey', 'id': 41 },
+        { 'name': 'New Mexico', 'id': 42 },
+        { 'name': 'New York', 'id': 43 },
+        { 'name': 'North Carolina', 'id': 44 },
+        { 'name': 'North Dakota', 'id': 45 },
+        { 'name': 'Northern Mariana Islands', 'id': 46 },
+        { 'name': 'Ohio', 'id': 47 },
+        { 'name': 'Oklahoma', 'id': 48 },
+        { 'name': 'Oregon', 'id': 49 },
+        { 'name': 'Palau', 'id': 50 },
+        { 'name': 'Pennsylvania', 'id': 51 },
+        { 'name': 'Puerto Rico', 'id': 52 },
+        { 'name': 'Rhode Island', 'id': 53 },
+        { 'name': 'South Carolina', 'id': 54 },
+        { 'name': 'South Dakota', 'id': 55 },
+        { 'name': 'Tennessee', 'id': 56 },
+        { 'name': 'Texas', 'id': 57 },
+        { 'name': 'Utah', 'id': 58 },
+        { 'name': 'Vermont', 'id': 59 },
+        { 'name': 'Virgin Islands', 'id': 60 },
+        { 'name': 'Virginia', 'id': 61 },
+        { 'name': 'Washington', 'id': 62 },
+        { 'name': 'West Virginia', 'id': 63 },
+        { 'name': 'Wisconsin', 'id': 64 },
+        { 'name': 'Wyoming', 'id': 65 },
+      ],
     }
-    const province = billingAddress?.province
-    return null
+
+    const state = statesData.states.find(s => s.name.toLowerCase() === stateName.toLowerCase())
+    return state ? state.id : false
   }
+
 }
 
 module.exports = TaxController
