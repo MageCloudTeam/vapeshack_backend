@@ -106,8 +106,8 @@ class TaxController {
       const itemPrice = itemParent.price
       if (['23', '32', '34', '51'].includes(stateId)) {
         if (taxValueArr.wholesale && cost) {
-          amount += parseInt(((cost * taxValueArr.wholesale / 100) * qty))
-          itemParent.exciseTax = parseInt((cost * taxValueArr.wholesale / 100) * qty)
+          amount += parseInt(((cost * taxValueArr.wholesale ) * qty))
+          itemParent.exciseTax = parseInt((cost * taxValueArr.wholesale ) * qty)
         }
       }
       else {
