@@ -173,7 +173,7 @@ class TaxController {
 
       }
       exciseItems.push({
-        title: itemParent.handle,
+        title: `${itemParent.title}-${itemParent.variant_title}`,
         tax: itemParent.exciseTax / 100,
       })
     }
