@@ -141,9 +141,8 @@ class TaxController {
           itemParent.exciseTax = parseInt((juiceVolume * exciseVolumeBase * qty)*100)
 
         } else if (exciseRetailBase && itemPrice && exciseTaxPercent) {
-
-          amount += parseInt(((itemPrice * exciseTaxPercent) * qty))
-          itemParent.exciseTax = parseInt((itemPrice * exciseTaxPercent) * qty)
+          amount += parseInt((((itemPrice * exciseTaxPercent)/ 100) * qty))
+          itemParent.exciseTax = parseInt(((itemPrice * exciseTaxPercent)/ 100) * qty)
 
         } else if (exciseOnlyVolume && juiceVolume) {
           let exciseAmt = 0
@@ -160,8 +159,8 @@ class TaxController {
 
           // Open
           if (cost && exciseTaxPercent) {
-            amount += parseInt(((cost * exciseTaxPercent) * qty))
-            itemParent.exciseTax = parseInt((cost * exciseTaxPercent) * qty)
+            amount += parseInt((((cost * exciseTaxPercent)/ 100) * qty))
+            itemParent.exciseTax = parseInt(((cost * exciseTaxPercent)/ 100) * qty)
           }
           // Closed
           if (exciseTaxValue && juiceVolume) {
