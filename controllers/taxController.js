@@ -21,17 +21,20 @@ class TaxController {
   }
 
   static async verifyOrder (_req, res) {
-    console.log(_req.body)
     try {
       const order = _req.body
       const stateId = TaxController.#getStateId(order.billing_address.province)
       let tags = order.tags.split(', ')
       tags.push('tax-issue')
       if (stateId) {
-        const quantity = (await TaxController.#calculateExciseTax(order.line_items, stateId.toString()))?.summary
+        const taxes = await TaxController.#calculateExciseTax(order.line_items, stateId.toString())
+        const quantity = taxes?.summary
         const taxProduct = order.line_items.find(item => {return item.product_id === 7075063005264})
-        if (quantity === 0 && !taxProduct || (quantity === taxProduct.quantity)) {
+        if (quantity === 0 && !taxProduct) {
           return res.status(200).json()
+        } else if (quantity === taxProduct.quantity) {
+          return res.status(200).json()
+
         } else {
           await TaxController.shopify.order.update(order.id, { tags: tags.join(', ') })
           return res.status(200).json()
@@ -41,26 +44,30 @@ class TaxController {
       }
 
     } catch (error) {
-      console.log(error)
       res.status(400).json({ error: error })
     }
   }
 
   static #getStateTaxPrice (stateId) {
     const stateTaxData = {
-      '32': { /* Massachusetts */ 'wholesale': 75 },
+      // '32': { /* Massachusetts */ 'wholesale': 75 },
       '23': { /* Illinois */ 'wholesale': 15 },
       '51': { /* Pennsylvania */ 'wholesale': 40 },
       '26': { /* Kansas */ 'volumebase': 0.05 },
       '14': { /* Connecticut */ 'open': 10, 'close': 0.40 },
       '34': { /* Minnesota */ 'wholesale': 95 },
       '41': { /* New Jersey */ 'open': 10, 'close': 0.10, 'retailprice': 1 },
-      '19': { /* Georgia */ 'open': 7, 'close': 0.05, 'retailprice': 1 },
+      // '19': { /* Georgia */ 'open': 7, 'close': 0.05, 'retailprice': 1 },
       '62': { /* Washington */ 'open': 0.09, 'close': 0.27, 'onlyvolume': 1 },
       '12': { /* California */ 'open': 12.5, 'close': 12.5, 'retailprice': 1 },
     }
 
     return stateTaxData[stateId] || {}
+  }
+
+  static #formatPrice (price) {
+    const formattedPrice = Math.round(price * 100) / 100
+    return parseFloat(formattedPrice.toFixed(2))
   }
 
   static async #calculateExciseTax (items, stateId) {
@@ -106,11 +113,12 @@ class TaxController {
 
       const itemParent = item
       qty = itemParent.quantity
-      const itemPrice = itemParent.price
+      const itemPrice = itemParent.price / 100
+
       if (['23', '32', '34', '51'].includes(stateId)) {
         if (taxValueArr.wholesale && cost) {
-          amount += parseInt(((cost * taxValueArr.wholesale) * qty))
-          itemParent.exciseTax = parseInt((cost * taxValueArr.wholesale) * qty)
+          amount += this.#formatPrice(((cost * taxValueArr.wholesale) / 100) * qty)
+          itemParent.exciseTax = this.#formatPrice(((cost * taxValueArr.wholesale) / 100) * qty)
         }
       } else {
         if (juiceType === 'Open') {
@@ -131,53 +139,51 @@ class TaxController {
         exciseVolumeBase = taxValueArr.volumebase || 0
         exciseRetailBase = taxValueArr.retailprice || 0
         exciseOnlyVolume = taxValueArr.onlyvolume || 0
+
         // For items who have not set juice_type or juice_volume
         if (exciseTaxPercent === 0 && stateId === '12') {
           exciseTaxPercent = taxValueArr.open
         }
         // Volume Base
         if (exciseVolumeBase && juiceVolume) {
-          amount += parseInt((juiceVolume * exciseVolumeBase * qty)*100)
-          itemParent.exciseTax = parseInt((juiceVolume * exciseVolumeBase * qty)*100)
+          amount += this.#formatPrice((juiceVolume * exciseVolumeBase) * qty)
+          itemParent.exciseTax = this.#formatPrice((juiceVolume * exciseVolumeBase) * qty)
 
         } else if (exciseRetailBase && itemPrice && exciseTaxPercent) {
-          amount += parseInt((((itemPrice * exciseTaxPercent)/ 100) * qty))
-          itemParent.exciseTax = parseInt(((itemPrice * exciseTaxPercent)/ 100) * qty)
-
+          amount += this.#formatPrice(((itemPrice * exciseTaxPercent) / 100) * qty)
+          itemParent.exciseTax = this.#formatPrice(((itemPrice * exciseTaxPercent) / 100) * qty)
         } else if (exciseOnlyVolume && juiceVolume) {
           let exciseAmt = 0
           if (juiceType === 'Open') {
-
             exciseAmt = taxValueArr.open
           } else if (juiceType === 'Closed') {
             exciseAmt = taxValueArr.close
           }
-          amount += parseInt((juiceVolume * exciseAmt * qty)*100)
-          itemParent.exciseTax = parseInt((juiceVolume * exciseAmt * qty)*100)
+          amount += this.#formatPrice((juiceVolume * exciseAmt) * qty)
+          itemParent.exciseTax = this.#formatPrice((juiceVolume * exciseAmt) * qty)
 
         } else {
 
           // Open
           if (cost && exciseTaxPercent) {
-            amount += parseInt((((cost * exciseTaxPercent)/ 100) * qty))
-            itemParent.exciseTax = parseInt(((cost * exciseTaxPercent)/ 100) * qty)
+            amount += this.#formatPrice(((cost * exciseTaxPercent) / 100) * qty)
+            itemParent.exciseTax = this.#formatPrice(((cost * exciseTaxPercent) / 100) * qty)
           }
           // Closed
           if (exciseTaxValue && juiceVolume) {
-            amount += parseInt(((juiceVolume * exciseTaxValue) * qty)*100)
-            itemParent.exciseTax = parseInt((juiceVolume * exciseTaxValue * qty)*100)
+            amount += this.#formatPrice(((juiceVolume * exciseTaxValue) * qty))
+            itemParent.exciseTax = this.#formatPrice((juiceVolume * exciseTaxValue) * qty)
           }
-
         }
 
       }
       exciseItems.push({
         title: `${itemParent.title}-${itemParent.variant_title}`,
-        tax: itemParent.exciseTax / 100,
+        tax: itemParent.exciseTax,
       })
     }
     return {
-      summary: amount,
+      summary: amount*100,
       items: exciseItems,
     }
   }
