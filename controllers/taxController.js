@@ -183,7 +183,7 @@ class TaxController {
       })
     }
     return {
-      summary: amount*100,
+      summary: parseInt((amount*100)),
       items: exciseItems,
     }
   }
